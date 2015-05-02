@@ -39,12 +39,56 @@ class MovieDetailViewController: UIViewController {
         
         /* TASK A: Get favorite movies, then update the favorite buttons */
         /* 1A. Set the parameters */
+        let methodParemeters = [
+            "api_key": appDelegate.apiKey,
+            "session_id": appDelegate.sessionID!,
+            "page": "1"
+        ]
         /* 2A. Build the URL */
+        let urlString = appDelegate.baseURLSecureString + "account/\(appDelegate.userID)/favorite/movies" + appDelegate.escapedParameters(methodParemeters)
+        let url = NSURL(string: urlString)!
+        
         /* 3A. Configure the request */
+        let request = NSMutableURLRequest(URL: url)
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        
         /* 4A. Make the request */
-        /* 5A. Parse the data */
-        /* 6A. Use the data! */
+        let task = session.dataTaskWithRequest(request) { data, request, downloadError in
+            if let error = downloadError {
+                println("Error with request: \(error)")
+            } else {
+                var parseError: NSError? = nil
+                let parsedResult = NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments, error: &parseError) as! NSDictionary
+                
+                println(parsedResult)
+                if let results = parsedResult["results"] as? [[String: AnyObject]] {
+                    let movies = Movie.moviesFromResults(results)
+                    var isFavorite = false
+                    
+                    for movie in movies {
+                        if movie.id == self.movie!.id {
+                            isFavorite == true
+                        }
+                    }
+
+                    dispatch_async(dispatch_get_main_queue()) {
+                        if isFavorite {
+                            self.movieIsFavorite()
+                        } else {
+                            self.movieIsNotFavorite()
+                        }
+                    }
+                } else {
+                    println("No favorites")
+                    dispatch_async(dispatch_get_main_queue()) {
+                        self.movieIsNotFavorite()
+                    }
+                }
+            }
+        }
+
         /* 7A. Start the request */
+        task.resume()
         
         /* TASK B: Get the poster image, then populate the image view */
         if let posterPath = movie!.posterPath {
@@ -107,5 +151,16 @@ class MovieDetailViewController: UIViewController {
         /* 5. Parse the data */
         /* 6. Use the data! */
         /* 7. Start the request */
+    }
+    
+    // MARK: Utilities
+    func movieIsFavorite() {
+        favoriteButton.hidden = true
+        unFavoriteButton.hidden = false
+    }
+    
+    func movieIsNotFavorite() {
+        favoriteButton.hidden = false
+        unFavoriteButton.hidden = true
     }
 }
