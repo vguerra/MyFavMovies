@@ -130,30 +130,69 @@ class MovieDetailViewController: UIViewController {
     // MARK: - Favorite Actions
     
     @IBAction func unFavoriteButtonTouchUpInside(sender: AnyObject) {
-        
-        /* TASK: Remove movie as favorite, then update favorite buttons */
-        /* 1. Set the parameters */
-        /* 2. Build the URL */
-        /* 3. Configure the request */
-        /* 4. Make the request */
-        /* 5. Parse the data */
-        /* 6. Use the data! */
-        /* 7. Start the request */
+        sendMovieFavStatus(isFavorite: false, complitionHandler: self.movieIsNotFavorite)
     }
     
     @IBAction func favoriteButtonTouchUpInside(sender: AnyObject) {
-        
-        /* TASK: Add movie as favorite, then update favorite buttons */
-        /* 1. Set the parameters */
-        /* 2. Build the URL */
-        /* 3. Configure the request */
-        /* 4. Make the request */
-        /* 5. Parse the data */
-        /* 6. Use the data! */
-        /* 7. Start the request */
+        sendMovieFavStatus(isFavorite: true, complitionHandler: self.movieIsFavorite)
     }
     
     // MARK: Utilities
+    
+    func sendMovieFavStatus(#isFavorite: Bool, complitionHandler: () -> Void ) {
+        let acceptedResponseCodes: [Int]
+        if isFavorite {
+            acceptedResponseCodes = [1, 12]
+        } else {
+            acceptedResponseCodes = [13]
+        }
+        
+        let methodParameters = [
+            "api_key": appDelegate.apiKey,
+            "session_id": appDelegate.sessionID!,
+        ]
+        
+        let urlString = appDelegate.baseURLSecureString + "account/\(appDelegate.userID)/favorite" + appDelegate.escapedParameters(methodParameters)
+        let url = NSURL(string: urlString)!
+        
+        let bodyParameters = [
+            "media_type": "movie",
+            "media_id": movie!.id,
+            "favorite": isFavorite
+        ]
+        
+        let request = NSMutableURLRequest(URL: url)
+        request.HTTPMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.HTTPBody = NSJSONSerialization.dataWithJSONObject(bodyParameters, options: nil, error: nil)
+        
+        let task = session.dataTaskWithRequest(request) {data, response, downloadError in
+            if let error = downloadError {
+                // report error here
+            } else {
+                var parseError: NSError? = nil
+                let parsedResult = NSJSONSerialization.JSONObjectWithData(data, options: .AllowFragments, error: &parseError) as! NSDictionary
+                println("fav response \(parsedResult)")
+                if let status_code = parsedResult["status_code"] as? Int {
+                    if contains(acceptedResponseCodes, status_code) {
+                        dispatch_async(dispatch_get_main_queue()) {
+                            complitionHandler()
+                        }
+                    } else {
+                        let status_message = (parsedResult["status_message"] as! String)
+                        println("Error on favorting movie \(status_code): \(status_message)")
+                    }
+                } else {
+                    println("No status_code in response")
+                }
+            }
+        }
+        
+        task.resume()
+    
+    }
+    
     func movieIsFavorite() {
         favoriteButton.hidden = true
         unFavoriteButton.hidden = false
